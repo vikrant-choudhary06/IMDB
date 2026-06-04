@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const DEFAULT_BACKEND_URL = import.meta.env.DEV ? 'http://localhost:8000/api' : '/api';
+const DEFAULT_BACKEND_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000/api' : '/api');
 const DEMO_API_KEY = 'demo_key_99f2b8';
 
 const api = axios.create({
