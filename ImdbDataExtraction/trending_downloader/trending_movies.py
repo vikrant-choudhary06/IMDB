@@ -178,7 +178,7 @@ def extract_movie_ids(data):
                 
                 # Character info for cast
                 characters = []
-                if "characters" in credit:
+                if "characters" in credit and credit.get("characters") is not None:
                     for char in credit.get("characters", []):
                         characters.append(char.get("name"))
                 

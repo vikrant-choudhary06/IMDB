@@ -463,7 +463,7 @@ def format_movie_details(data):
             
             # Character info for cast
             characters = []
-            if "characters" in credit:
+            if "characters" in credit and credit.get("characters") is not None:
                 for char in credit.get("characters", []):
                     characters.append(char.get("name"))
             
@@ -709,7 +709,7 @@ def format_movie_details(data):
                 
                 if category == "Stars":
                     characters = []
-                    if "characters" in credit:
+                    if "characters" in credit and credit.get("characters") is not None:
                         for char in credit.get("characters", []):
                             if char.get("name"):
                                 characters.append(char.get("name"))
