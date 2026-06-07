@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Copy, Check, ExternalLink, Globe, HelpCircle, Code, ArrowRight } from 'lucide-react';
-import { getEffectiveKey } from '../utils/api';
+import { getEffectiveKey, DEFAULT_BACKEND_URL } from '../utils/api';
 
 const ENDPOINTS = [
   {
@@ -151,7 +151,7 @@ export default function Docs() {
   const [snippetLang, setSnippetLang] = useState('javascript');
   
   const devKey = getEffectiveKey();
-  const baseUrl = 'http://localhost:8000';
+  const baseUrl = DEFAULT_BACKEND_URL.endsWith('/api') ? DEFAULT_BACKEND_URL.slice(0, -4) : DEFAULT_BACKEND_URL;
 
   const copyToClipboard = (text, index) => {
     navigator.clipboard.writeText(text);

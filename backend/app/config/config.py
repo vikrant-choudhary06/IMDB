@@ -27,10 +27,8 @@ class Settings:
     # SQLite Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./data/api_keys.db")
     
-    # Redis configuration
-    REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
-    REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
-    REDIS_PASSWORD: str = os.getenv("REDIS_PASSWORD", "")
+    # MongoDB configuration
+    MONGO_URI: str = os.getenv("MONGO_URI", "mongodb://localhost:27017")
     CACHE_TTL: int = int(os.getenv("CACHE_TTL", "3600"))
     
     # Security / API Keys

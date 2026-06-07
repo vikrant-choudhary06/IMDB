@@ -1,14 +1,15 @@
 import time
 import json
 import threading
+from datetime import datetime, timezone, timedelta
 from backend.app.config.config import settings
 
-# Attempt to import redis
+# Attempt to import pymongo
 try:
-    import redis
-    REDIS_AVAILABLE = True
+    import pymongo
+    MONGO_AVAILABLE = True
 except ImportError:
-    REDIS_AVAILABLE = False
+    MONGO_AVAILABLE = False
 
 class LocalCache:
     """Thread-safe in-memory cache with TTL support"""
@@ -38,36 +39,53 @@ class LocalCache:
 
 class HybridCache:
     def __init__(self):
-        self.redis_client = None
+        self.mongo_client = None
+        self.collection = None
         self.local_cache = LocalCache()
         
-        if REDIS_AVAILABLE:
+        if MONGO_AVAILABLE:
             try:
-                self.redis_client = redis.Redis(
-                    host=settings.REDIS_HOST,
-                    port=settings.REDIS_PORT,
-                    password=settings.REDIS_PASSWORD or None,
-                    decode_responses=True,
-                    socket_connect_timeout=2  # Fail fast
+                # Fail fast connection
+                self.mongo_client = pymongo.MongoClient(
+                    settings.MONGO_URI, 
+                    serverSelectionTimeoutMS=2000
                 )
                 # Test connection
-                self.redis_client.ping()
-                print("Connected to Redis successfully.")
+                self.mongo_client.admin.command('ping')
+                
+                db = self.mongo_client["imdb_scraper"]
+                self.collection = db["api_cache"]
+                
+                # Create TTL index on expiresAt field
+                self.collection.create_index(
+                    "expiresAt", 
+                    expireAfterSeconds=0, 
+                    background=True
+                )
+                # Create a unique index on the key
+                self.collection.create_index("key", unique=True, background=True)
+                
+                print("Connected to MongoDB successfully.")
             except Exception as e:
-                print(f"Warning: Could not connect to Redis: {e}. Falling back to in-memory caching.")
-                self.redis_client = None
+                print(f"Warning: Could not connect to MongoDB: {e}. Falling back to in-memory caching.")
+                self.mongo_client = None
+                self.collection = None
         else:
-            print("Warning: Redis package is not installed. Falling back to in-memory caching.")
+            print("Warning: pymongo package is not installed. Falling back to in-memory caching.")
 
     def get(self, key: str):
-        if self.redis_client:
+        if self.collection is not None:
             try:
-                val = self.redis_client.get(key)
-                if val:
-                    return json.loads(val)
+                # MongoDB query
+                doc = self.collection.find_one({"key": key})
+                if doc:
+                    # Check if manually expired (in case TTL monitor hasn't run yet)
+                    if doc.get("expiresAt") and doc["expiresAt"].replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+                        self.collection.delete_one({"_id": doc["_id"]})
+                        return None
+                    return doc.get("value")
             except Exception as e:
-                print(f"Redis cache read error: {e}")
-                # Fallback to local
+                print(f"MongoDB cache read error: {e}")
                 return self.local_cache.get(key)
         return self.local_cache.get(key)
 
@@ -76,13 +94,18 @@ class HybridCache:
         if ttl is None:
             ttl = settings.CACHE_TTL
             
-        if self.redis_client:
+        if self.collection is not None:
             try:
-                serialized = json.dumps(val)
-                self.redis_client.set(key, serialized, ex=ttl)
+                expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl)
+                # Upsert cache entry
+                self.collection.update_one(
+                    {"key": key},
+                    {"$set": {"value": val, "expiresAt": expires_at}},
+                    upsert=True
+                )
                 return
             except Exception as e:
-                print(f"Redis cache write error: {e}")
+                print(f"MongoDB cache write error: {e}")
                 
         # Fallback/Local write
         self.local_cache.set(key, val, ttl)
